@@ -330,7 +330,19 @@ fn main() -> eframe::Result<()> {
     if let Some(i) = icon() {
         viewport = viewport.with_icon(i);
     }
-    let options = eframe::NativeOptions { viewport, ..Default::default() };
+    let mut options = eframe::NativeOptions { viewport, ..Default::default() };
+    // Intel macOS workaround: avoid wgpu's indirect-call validation shaders on older Metal GPUs.
+    // GridCraft does not rely on indirect draws or dispatches.
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    if let eframe::egui_wgpu::WgpuSetup::CreateNew(create) =
+        &mut options.wgpu_options.wgpu_setup
+    {
+        create.instance_descriptor.flags = create
+            .instance_descriptor
+            .flags
+            .difference(eframe::wgpu::InstanceFlags::VALIDATION_INDIRECT_CALL)
+            .with_env();
+    }
     // Before eframe creates the wgpu instance: Windows starts on DirectX 12, or OpenGL when
     // DirectX 12 has no GPU driver, and never touches Vulkan unless asked (see graphics.rs).
     #[cfg(target_os = "windows")]
